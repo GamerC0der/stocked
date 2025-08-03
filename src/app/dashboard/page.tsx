@@ -8,9 +8,11 @@ import { SearchInput } from "@/components/ui/search-input";
 import { ButtonCta } from "@/components/ui/button-shiny";
 import { useState, useEffect } from "react";
 import { fetchMultipleStocks, fetchStockChart, fetchStockQuote, watchlistDB, exportWatchlist, importWatchlist, fetchRecentIPOs, type StockData, type ChartData, type IPOData } from "@/lib/stock-api";
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import { useToast } from "@/components/ui/toast";
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Plus, Eye, EyeOff, TrendingUp, BarChart3, PieChart, Search, Sun, Moon } from "lucide-react";
+import { Plus, Eye, EyeOff, TrendingUp, BarChart3, PieChart, Search, Sun, Moon, Download } from "lucide-react";
 import DateRangePicker, { type DateRange } from "@/components/ui/date-range";
 
 const stockSymbols = ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN", "META", "NVDA", "NFLX", "SPY", "QQQ"];
@@ -75,6 +77,7 @@ export default function Dashboard() {
     sp500: { symbol: string; price: number; change: number; changePercent: number };
     nasdaq: { symbol: string; price: number; change: number; changePercent: number };
   } | null>(null);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -691,6 +694,98 @@ export default function Dashboard() {
     return bands;
   }
 
+  const exportChartAsCSV = () => {
+    if (!selectedStock || !chartData.length) return;
+    
+    const data = prepareChartDataWithIndicators(chartData);
+    const headers = ['Date', 'Price'];
+    const rows = [headers];
+    
+    data.forEach(item => {
+      const row = [item.date, item.price.toString()];
+      if (indicators.sma.enabled && (item as any).sma) row.push((item as any).sma.toString());
+      if (indicators.ema.enabled && (item as any).ema) row.push((item as any).ema.toString());
+      if (indicators.bollinger.enabled && (item as any).bbUpper) {
+        row.push((item as any).bbUpper.toString());
+        row.push((item as any).bbMiddle.toString());
+        row.push((item as any).bbLower.toString());
+      }
+      rows.push(row);
+    });
+    
+    if (indicators.sma.enabled) headers.push(`SMA ${indicators.sma.period}`);
+    if (indicators.ema.enabled) headers.push(`EMA ${indicators.ema.period}`);
+    if (indicators.bollinger.enabled) {
+      headers.push('BB Upper', 'BB Middle', 'BB Lower');
+    }
+    
+    const csvContent = rows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedStock.symbol}_chart_data_${daysRange}D.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast('Chart data exported as CSV', 'success');
+  };
+
+  const exportChartAsPDF = () => {
+    if (!selectedStock || !chartData.length) return;
+    
+    try {
+      const doc = new jsPDF();
+      const data = prepareChartDataWithIndicators(chartData);
+      
+      doc.setFontSize(16);
+      doc.text(`${selectedStock.symbol} Stock Chart - ${daysRange} Days`, 20, 20);
+      
+      doc.setFontSize(12);
+      doc.text(`Current Price: $${selectedStock.price.toFixed(2)}`, 20, 35);
+      
+      const startDate = data[0]?.date || '';
+      const endDate = data[data.length - 1]?.date || '';
+      doc.text(`Date Range: ${startDate} to ${endDate}`, 20, 45);
+      
+      doc.setFontSize(10);
+      const headers = ['Date', 'Price'];
+      if (indicators.sma.enabled) headers.push(`SMA ${indicators.sma.period}`);
+      if (indicators.ema.enabled) headers.push(`EMA ${indicators.ema.period}`);
+      if (indicators.bollinger.enabled) {
+        headers.push('BB Upper', 'BB Middle', 'BB Lower');
+      }
+      
+      const tableData = data.slice(-20).map(item => {
+        const row = [item.date, item.price.toString()];
+        if (indicators.sma.enabled && (item as any).sma) row.push((item as any).sma.toString());
+        if (indicators.ema.enabled && (item as any).ema) row.push((item as any).ema.toString());
+        if (indicators.bollinger.enabled && (item as any).bbUpper) {
+          row.push((item as any).bbUpper.toString());
+          row.push((item as any).bbMiddle.toString());
+          row.push((item as any).bbLower.toString());
+        }
+        return row;
+      });
+      
+      (doc as any).autoTable({
+        head: [headers],
+        body: tableData,
+        startY: 60,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [75, 75, 75] }
+      });
+      
+      doc.save(`${selectedStock.symbol}_chart_report_${daysRange}D.pdf`);
+      showToast('Chart exported as PDF', 'success');
+    } catch (error) {
+      console.error('PDF export error:', error);
+      showToast('Failed to export PDF. Please try again.', 'error');
+    }
+  };
+
   function prepareChartDataWithIndicators(data: ChartData[]) {
     if (!data || data.length === 0) return data;
     
@@ -738,7 +833,9 @@ export default function Dashboard() {
         <Component />
         <div className="relative z-10 p-8">
           <div className="flex justify-between items-start mb-8">
-            <h1 className={`text-4xl font-bold animate-fade-in ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Stocked</h1>
+            <h1 className={`text-4xl font-bold animate-fade-in ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              <span className="text-green-500">$</span>tocked
+            </h1>
           </div>
           <div className="flex justify-center items-center h-96">
             <div className={`text-2xl font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -760,7 +857,9 @@ export default function Dashboard() {
       <Component />
       <div className="relative z-10 p-8 overflow-x-auto">
         <div className="flex justify-between items-start mb-8">
-          <h1 className={`text-4xl font-bold animate-fade-in ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Stocked</h1>
+          <h1 className={`text-4xl font-bold animate-fade-in ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            <span className="text-green-500">$</span>tocked
+          </h1>
           
           <div className={`${isDarkMode ? 'bg-white/10' : 'bg-gray-800/90'} backdrop-blur-sm rounded-lg border ${isDarkMode ? 'border-white/20' : 'border-gray-700'} transition-colors duration-300`}>
             <Select value={selectedStock?.symbol || ""} onValueChange={(val) => {
@@ -952,8 +1051,7 @@ export default function Dashboard() {
                 isDarkMode ? 'bg-gray-900/95' : 'bg-gray-100/95'
               }`}>
                 <div className="text-center">
-                  <div className={`text-2xl font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>No Stock Selected</div>
-                  <div className={`mb-6 ${isDarkMode ? 'text-white/60' : 'text-gray-600'}`}>Use the dropdown below to select a stock</div>
+                  <div className={`text-2xl font-semibold mb-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>No Stock Selected</div>
                   <div className={`backdrop-blur-sm rounded-lg border inline-block transition-colors duration-300 ${
                     isDarkMode ? 'bg-white/10 border-white/20' : 'bg-white/80 border-gray-300'
                   }`}>
@@ -1100,6 +1198,18 @@ export default function Dashboard() {
                     <span>Advanced</span>
                     <span className={`transition-transform duration-200 ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
                   </div>
+                  <button
+                    className={`w-full px-3 py-1.5 rounded-md text-sm transition-all duration-200 hover:shadow-sm flex items-center gap-2 ${
+                      isDarkMode 
+                        ? 'bg-white/10 hover:bg-white/20 text-white' 
+                        : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
+                    }`}
+                    onClick={() => setExportModalOpen(true)}
+                    disabled={!selectedStock || !chartData.length}
+                  >
+                    <Download className="h-4 w-4" />
+                    Export Chart
+                  </button>
                 </div>
                 {showAdvanced && (
                   <div className="pt-2 border-t border-white/10 space-y-2">
@@ -1673,6 +1783,65 @@ export default function Dashboard() {
               }}
             >
               Apply
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={exportModalOpen} onOpenChange={setExportModalOpen}>
+        <DialogContent className="bg-gray-800 border-white/20 text-white">
+          <DialogHeader>
+            <DialogTitle>Export Chart Data</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <p className="text-sm text-gray-300">
+              Choose export format for {selectedStock?.symbol}
+            </p>
+            
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                onClick={() => {
+                  exportChartAsCSV();
+                  setExportModalOpen(false);
+                }}
+                className="flex items-center gap-3 p-4 rounded-lg border border-white/20 hover:bg-white/10 transition-colors text-left"
+                disabled={!selectedStock || !chartData.length}
+              >
+                <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                  <span className="text-green-400 font-bold">CSV</span>
+                </div>
+                <div>
+                  <div className="font-medium">Export as CSV</div>
+                  <div className="text-sm text-gray-400">Download chart data as spreadsheet</div>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => {
+                  exportChartAsPDF();
+                  setExportModalOpen(false);
+                }}
+                className="flex items-center gap-3 p-4 rounded-lg border border-white/20 hover:bg-white/10 transition-colors text-left"
+                disabled={!selectedStock || !chartData.length}
+              >
+                <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
+                  <span className="text-red-400 font-bold">PDF</span>
+                </div>
+                <div>
+                  <div className="font-medium">Export as PDF</div>
+                  <div className="text-sm text-gray-400">Create detailed report with chart data</div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <button
+              className="px-4 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm"
+              onClick={() => setExportModalOpen(false)}
+            >
+              Cancel
             </button>
           </DialogFooter>
         </DialogContent>
