@@ -2,8 +2,8 @@
 
 import { Component } from "@/components/ui/bg-gradient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/modal";
-import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/modal";
+
 import { SearchInput } from "@/components/ui/search-input";
 import { ButtonCta } from "@/components/ui/button-shiny";
 import { useState, useEffect } from "react";
@@ -33,18 +33,11 @@ export default function Dashboard() {
   const [chartType, setChartType] = useState<'line' | 'area' | 'bar'>('line');
   const [daysRange, setDaysRange] = useState<30 | 90 | 1825>(30);
   const [customRangeOpen, setCustomRangeOpen] = useState(false);
-  const [customStart, setCustomStart] = useState<string>("");
-  const [customEnd, setCustomEnd] = useState<string>("");
   const [dateRange, setDateRange] = useState<DateRange>({});
   const [compareOn, setCompareOn] = useState(false);
   const [compareSymbol, setCompareSymbol] = useState<string | null>(null);
   const [compareChartData, setCompareChartData] = useState<ChartData[]>([]);
-  const [primaryFilter, setPrimaryFilter] = useState("");
-  const [compareFilter, setCompareFilter] = useState("");
-  const [primaryActiveIdx, setPrimaryActiveIdx] = useState(0);
-  const [compareActiveIdx, setCompareActiveIdx] = useState(0);
-  const [primaryShowAll, setPrimaryShowAll] = useState(false);
-  const [compareShowAll, setCompareShowAll] = useState(false);
+
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showIPOs, setShowIPOs] = useState(false);
   const [ipos, setIpos] = useState<IPOData[]>([]);
@@ -52,7 +45,7 @@ export default function Dashboard() {
   const [loadingIPOs, setLoadingIPOs] = useState(false);
   const [loadingRecentIPOs, setLoadingRecentIPOs] = useState(false);
   const [ipoView, setIpoView] = useState<'upcoming' | 'recent'>('upcoming');
-  const [showTechnicalIndicators, setShowTechnicalIndicators] = useState(false);
+
   const [previousPrice, setPreviousPrice] = useState<number | null>(null);
   const [comparePreviousPrice, setComparePreviousPrice] = useState<number | null>(null);
   const [showWatchlist, setShowWatchlist] = useState(false);
@@ -61,11 +54,8 @@ export default function Dashboard() {
   const [watchlistLoading, setWatchlistLoading] = useState(false);
   const [watchlistSearch, setWatchlistSearch] = useState("");
   const [includeWatchlistInSearch, setIncludeWatchlistInSearch] = useState(false);
-  const [showSearchInterface, setShowSearchInterface] = useState(true);
-  const [searchInterfaceQuery, setSearchInterfaceQuery] = useState("");
-  const [searchInterfaceResults, setSearchInterfaceResults] = useState<{ symbol: string; name: string; source?: 'search' | 'watchlist' }[]>([]);
-  const [isSearchInterfaceSearching, setIsSearchInterfaceSearching] = useState(false);
-  const [indicators, setIndicators] = useState({
+
+  const [indicators] = useState({
     rsi: { enabled: false, period: 14 },
     macd: { enabled: false, fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 },
     bollinger: { enabled: false, period: 20, stdDev: 2 },
@@ -106,39 +96,17 @@ export default function Dashboard() {
           }
         });
       }
-    } catch (error) {
+    } catch {
     }
   };
 
-  function scoreStock(q: string, s: { symbol: string; name: string }) {
-    const qq = q.toLowerCase();
-    const sym = s.symbol.toLowerCase();
-    const name = s.name.toLowerCase();
-    if (sym.startsWith(qq)) return 1000 - (sym.length - qq.length);
-    if (name.startsWith(qq)) return 800 - (name.length - qq.length);
-    if (sym.includes(qq)) return 600 - sym.indexOf(qq);
-    if (name.includes(qq)) return 400 - name.indexOf(qq);
-    return -1;
-  }
+
 
   function roundToNearestFive(price: number): number {
     return Math.round(price / 5) * 5;
   }
 
-  function highlight(text: string, q: string) {
-    if (!q) return text as any;
-    const lower = text.toLowerCase();
-    const ql = q.toLowerCase();
-    const i = lower.indexOf(ql);
-    if (i < 0) return text as any;
-    return (
-      <>
-        {text.slice(0, i)}
-        <span className="bg-white/20 rounded px-0.5">{text.slice(i, i + q.length)}</span>
-        {text.slice(i + q.length)}
-      </>
-    ) as any;
-  }
+
 
   const fetchIPOs = async () => {
     setLoadingIPOs(true);
@@ -153,7 +121,7 @@ export default function Dashboard() {
       const data = await response.json();
       
       if (data.data && data.data.upcoming && data.data.upcoming.upcomingTable && data.data.upcoming.upcomingTable.rows) {
-        const ipoData = data.data.upcoming.upcomingTable.rows.map((row: any) => ({
+        const ipoData = data.data.upcoming.upcomingTable.rows.map((row: { proposedTickerSymbol?: string; companyName?: string; expectedPriceDate?: string; proposedSharePrice?: number }) => ({
           symbol: row.proposedTickerSymbol || 'N/A',
           name: row.companyName || 'N/A',
           date: row.expectedPriceDate || 'N/A',
@@ -164,7 +132,7 @@ export default function Dashboard() {
       } else {
         setIpos([]);
       }
-    } catch (error) {
+    } catch {
       setIpos([]);
     } finally {
       setLoadingIPOs(false);
@@ -176,7 +144,7 @@ export default function Dashboard() {
     try {
       const recentData = await fetchRecentIPOs();
       setRecentIPOs(recentData);
-    } catch (error) {
+    } catch {
       setRecentIPOs([]);
     } finally {
       setLoadingRecentIPOs(false);
@@ -202,25 +170,13 @@ export default function Dashboard() {
         setWatchlist([]);
         setWatchlistLoading(false);
       }
-    } catch (error) {
+    } catch {
       setWatchlist([]);
       setWatchlistLoading(false);
     }
   };
 
-  const addToWatchlist = async (symbol: string) => {
-    try {
-      const stockData = await fetchStockQuote(symbol);
-      if (stockData) {
-        const updatedWatchlist = [...watchlist, stockData];
-        setWatchlist(updatedWatchlist);
-        setWatchlistPrices(prev => ({...prev, [symbol]: stockData.price}));
-        
-        await watchlistDB.addToWatchlist(symbol);
-      }
-    } catch (error) {
-    }
-  };
+
 
   const removeFromWatchlist = async (symbol: string) => {
     const updatedWatchlist = watchlist.filter(stock => stock.symbol !== symbol);
@@ -249,7 +205,7 @@ export default function Dashboard() {
             if (Array.isArray(customSymbols) && customSymbols.length > 0) {
               customStocks = await fetchMultipleStocks(customSymbols);
             }
-          } catch (error) {
+          } catch {
           }
         }
         
@@ -257,7 +213,7 @@ export default function Dashboard() {
         setStocks(allStocks);
         setSelectedStock(null);
         setChartData([]);
-      } catch (error) {
+      } catch {
         showToast('Failed to load stock data', 'error');
       } finally {
         setLoading(false);
@@ -273,7 +229,7 @@ export default function Dashboard() {
       clearInterval(interval);
       clearInterval(marketInterval);
     };
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     function computeOpen() {
@@ -283,7 +239,7 @@ export default function Dashboard() {
       const day = et.getDay();
       const hour = et.getHours();
       const minute = et.getMinutes();
-      const year = et.getFullYear();
+
       const month = et.getMonth() + 1;
       const date = et.getDate();
       
@@ -338,7 +294,7 @@ export default function Dashboard() {
           if (extendedChart.length > chart.length) {
             setPreviousPrice(extendedChart[0].price);
           }
-        } catch (error) {
+        } catch {
           setPreviousPrice(null);
         }
         
@@ -351,19 +307,19 @@ export default function Dashboard() {
             if (extendedCompChart.length > comp.length) {
               setComparePreviousPrice(extendedCompChart[0].price);
             }
-          } catch (error) {
+          } catch {
             setComparePreviousPrice(null);
           }
         } else {
           setCompareChartData([]);
           setComparePreviousPrice(null);
         }
-      } catch (error) {
+      } catch {
         showToast('Failed to load chart data', 'error');
         setChartData([]);
       }
     })();
-  }, [daysRange, selectedStock, compareOn, compareSymbol]);
+  }, [daysRange, selectedStock, compareOn, compareSymbol, showToast]);
 
   const handleStockChange = async (symbol: string) => {
     if (symbol === "add-custom") {
@@ -377,7 +333,7 @@ export default function Dashboard() {
       try {
         const chart = await fetchStockChart(symbol, daysRange);
         setChartData(chart);
-      } catch (error) {
+      } catch {
         showToast('Failed to load chart data', 'error');
         setChartData([]);
       }
@@ -397,7 +353,7 @@ export default function Dashboard() {
         try {
           const chart = await fetchStockChart(stockData.symbol, daysRange);
           setChartData(chart);
-        } catch (error) {
+        } catch {
           showToast('Stock added but failed to load chart data', 'info');
           setChartData([]);
         }
@@ -410,7 +366,7 @@ export default function Dashboard() {
         if (savedCustomStocks) {
           try {
             customSymbols = JSON.parse(savedCustomStocks);
-                  } catch (error) {
+                  } catch {
         }
         }
         
@@ -424,34 +380,14 @@ export default function Dashboard() {
       } else {
         showToast(`Could not find stock data for ${originalSymbol}. Please check the symbol and try again.`, 'error');
       }
-    } catch (error) {
+    } catch {
       showToast("Error adding custom stock. Please try again.", 'error');
     } finally {
       setIsAddingStock(false);
     }
   };
 
-  const removeCustomStock = (symbolToRemove: string) => {
-    setStocks(prev => prev.filter(stock => stock.symbol !== symbolToRemove));
-    
-    const savedCustomStocks = localStorage.getItem('customStocks');
-    if (savedCustomStocks) {
-      try {
-        const customSymbols = JSON.parse(savedCustomStocks);
-        const updatedSymbols = customSymbols.filter((symbol: string) => symbol !== symbolToRemove);
-        localStorage.setItem('customStocks', JSON.stringify(updatedSymbols));
-      } catch (error) {
-      }
-    }
-    
-    if (selectedStock?.symbol === symbolToRemove) {
-      const remainingStocks = stocks.filter(stock => stock.symbol !== symbolToRemove);
-      if (remainingStocks.length > 0) {
-        setSelectedStock(remainingStocks[0]);
-        fetchStockChart(remainingStocks[0].symbol, daysRange).then(setChartData);
-      }
-    }
-  };
+
 
   const searchStocks = async (query: string) => {
     if (query.length < 2) {
@@ -466,7 +402,7 @@ export default function Dashboard() {
       
       let results = [];
       if (data.quotes) {
-        results = data.quotes.map((quote: any) => ({
+        results = data.quotes.map((quote: { symbol: string; shortname?: string; longname?: string }) => ({
           symbol: quote.symbol,
           name: quote.shortname || quote.longname || quote.symbol,
           source: 'search'
@@ -496,7 +432,7 @@ export default function Dashboard() {
       }
 
       setSearchResults(results);
-    } catch (error) {
+    } catch {
       setSearchResults([]);
     } finally {
       setIsSearching(false);
@@ -515,72 +451,10 @@ export default function Dashboard() {
     setSearchResults([]);
   };
 
-  const searchInterfaceSearch = async (query: string) => {
-    if (query.length < 2) {
-      setSearchInterfaceResults([]);
-      return;
-    }
 
-    setIsSearchInterfaceSearching(true);
-    try {
-      const response = await fetch(`https://corsproxy.io/?https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=10&newsCount=0`);
-      const data = await response.json();
-      
-      let results = [];
-      if (data.quotes) {
-        results = data.quotes.map((quote: any) => ({
-          symbol: quote.symbol,
-          name: quote.shortname || quote.longname || quote.symbol,
-          source: 'search' as const
-        }));
-      }
 
-      if (includeWatchlistInSearch && watchlist.length > 0) {
-        const watchlistResults = watchlist
-          .filter(stock => 
-            stock.symbol.toLowerCase().includes(query.toLowerCase()) ||
-            stock.name.toLowerCase().includes(query.toLowerCase())
-          )
-          .map(stock => ({
-            symbol: stock.symbol,
-            name: stock.name,
-            source: 'watchlist' as const
-          }));
-        
-        const allResults = [...watchlistResults, ...results];
-        const seen = new Set();
-        results = allResults.filter(item => {
-          const key = item.symbol.toLowerCase();
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-      }
-
-      setSearchInterfaceResults(results);
-    } catch (error) {
-      setSearchInterfaceResults([]);
-    } finally {
-      setIsSearchInterfaceSearching(false);
-    }
-  };
-
-  const handleSearchInterfaceChange = (query: string) => {
-    setSearchInterfaceQuery(query);
-    searchInterfaceSearch(query);
-  };
-
-  const selectSearchInterfaceResult = async (symbol: string) => {
-    setShowSearchInterface(false);
-    setSelectedStock(stocks.find(s => s.symbol === symbol) || null);
-    if (symbol) {
-      const chart = await fetchStockChart(symbol, daysRange);
-      setChartData(chart);
-    }
-  };
-
-  function mergeForCompare(primary: ChartData[], secondary: ChartData[]) {
-    if (!primary || primary.length === 0) return [] as any[];
+  function mergeForCompare(primary: ChartData[], secondary: ChartData[]): Array<{ date: string; p1: number; p2?: number }> {
+    if (!primary || primary.length === 0) return [];
     const byDate1 = new Map(primary.map(d => [d.date, d.price]));
     const byDate2 = new Map(secondary.map(d => [d.date, d.price]));
     const overlapDates = primary.map(d => d.date).filter(dt => byDate2.has(dt));
@@ -623,59 +497,12 @@ export default function Dashboard() {
     return ema;
   }
 
-  function calculateRSI(data: ChartData[], period: number) {
-    if (data.length < period + 1) return [];
-    const rsi = [];
-    let gains = 0, losses = 0;
-    
-    for (let i = 1; i <= period; i++) {
-      const change = data[i].price - data[i - 1].price;
-      if (change > 0) gains += change;
-      else losses -= change;
-    }
-    
-    let avgGain = gains / period;
-    let avgLoss = losses / period;
-    
-    for (let i = period; i < data.length; i++) {
-      const change = data[i].price - data[i - 1].price;
-      if (change > 0) {
-        avgGain = (avgGain * (period - 1) + change) / period;
-        avgLoss = (avgLoss * (period - 1)) / period;
-      } else {
-        avgGain = (avgGain * (period - 1)) / period;
-        avgLoss = (avgLoss * (period - 1) - change) / period;
-      }
-      
-      const rs = avgGain / avgLoss;
-      const rsiValue = 100 - (100 / (1 + rs));
-      rsi.push({ date: data[i].date, value: rsiValue });
-    }
-    return rsi;
-  }
 
-  function calculateMACD(data: ChartData[], fastPeriod: number, slowPeriod: number, signalPeriod: number) {
-    if (data.length < slowPeriod) return [];
-    const emaFast = calculateEMA(data, fastPeriod);
-    const emaSlow = calculateEMA(data, slowPeriod);
-    
-    const macdLine = emaFast.map((fast, i) => ({
-      date: fast.date,
-      value: fast.value - emaSlow[i].value
-    }));
-    
-    const signalLine = calculateEMA(macdLine.map(d => ({ date: d.date, price: d.value })), signalPeriod);
-    const histogram = macdLine.map((macd, i) => ({
-      date: macd.date,
-      value: macd.value - (signalLine[i]?.value || 0)
-    }));
-    
-    return { macdLine, signalLine, histogram };
-  }
+
+
 
   function calculateBollingerBands(data: ChartData[], period: number, stdDev: number) {
     if (data.length < period) return [];
-    const sma = calculateSMA(data, period);
     const bands = [];
     
     for (let i = period - 1; i < data.length; i++) {
@@ -703,12 +530,12 @@ export default function Dashboard() {
     
     data.forEach(item => {
       const row = [item.date, item.price.toString()];
-      if (indicators.sma.enabled && (item as any).sma) row.push((item as any).sma.toString());
-      if (indicators.ema.enabled && (item as any).ema) row.push((item as any).ema.toString());
-      if (indicators.bollinger.enabled && (item as any).bbUpper) {
-        row.push((item as any).bbUpper.toString());
-        row.push((item as any).bbMiddle.toString());
-        row.push((item as any).bbLower.toString());
+      if (indicators.sma.enabled && (item as ChartData & { sma?: number }).sma) row.push((item as ChartData & { sma?: number }).sma!.toString());
+      if (indicators.ema.enabled && (item as ChartData & { ema?: number }).ema) row.push((item as ChartData & { ema?: number }).ema!.toString());
+      if (indicators.bollinger.enabled && (item as ChartData & { bbUpper?: number; bbMiddle?: number; bbLower?: number }).bbUpper) {
+        row.push((item as ChartData & { bbUpper?: number; bbMiddle?: number; bbLower?: number }).bbUpper!.toString());
+        row.push((item as ChartData & { bbUpper?: number; bbMiddle?: number; bbLower?: number }).bbMiddle!.toString());
+        row.push((item as ChartData & { bbUpper?: number; bbMiddle?: number; bbLower?: number }).bbLower!.toString());
       }
       rows.push(row);
     });
@@ -760,17 +587,17 @@ export default function Dashboard() {
       
       const tableData = data.slice(-20).map(item => {
         const row = [item.date, item.price.toString()];
-        if (indicators.sma.enabled && (item as any).sma) row.push((item as any).sma.toString());
-        if (indicators.ema.enabled && (item as any).ema) row.push((item as any).ema.toString());
-        if (indicators.bollinger.enabled && (item as any).bbUpper) {
-          row.push((item as any).bbUpper.toString());
-          row.push((item as any).bbMiddle.toString());
-          row.push((item as any).bbLower.toString());
+        if (indicators.sma.enabled && (item as ChartData & { sma?: number }).sma) row.push((item as ChartData & { sma?: number }).sma!.toString());
+        if (indicators.ema.enabled && (item as ChartData & { ema?: number }).ema) row.push((item as ChartData & { ema?: number }).ema!.toString());
+        if (indicators.bollinger.enabled && (item as ChartData & { bbUpper?: number; bbMiddle?: number; bbLower?: number }).bbUpper) {
+          row.push((item as ChartData & { bbUpper?: number; bbMiddle?: number; bbLower?: number }).bbUpper!.toString());
+          row.push((item as ChartData & { bbUpper?: number; bbMiddle?: number; bbLower?: number }).bbMiddle!.toString());
+          row.push((item as ChartData & { bbUpper?: number; bbMiddle?: number; bbLower?: number }).bbLower!.toString());
         }
         return row;
       });
       
-      (doc as any).autoTable({
+      (doc as jsPDF & { autoTable: (options: { head: string[][]; body: string[][]; startY: number; styles: { fontSize: number }; headStyles: { fillColor: number[] } }) => void }).autoTable({
         head: [headers],
         body: tableData,
         startY: 60,
@@ -796,7 +623,7 @@ export default function Dashboard() {
       const smaMap = new Map(smaData.map(d => [d.date, d.value]));
       chartData.forEach(d => {
         if (smaMap.has(d.date)) {
-          (d as any).sma = smaMap.get(d.date);
+          (d as ChartData & { sma?: number }).sma = smaMap.get(d.date);
         }
       });
     }
@@ -806,7 +633,7 @@ export default function Dashboard() {
       const emaMap = new Map(emaData.map(d => [d.date, d.value]));
       chartData.forEach(d => {
         if (emaMap.has(d.date)) {
-          (d as any).ema = emaMap.get(d.date);
+          (d as ChartData & { ema?: number }).ema = emaMap.get(d.date);
         }
       });
     }
@@ -817,9 +644,9 @@ export default function Dashboard() {
       chartData.forEach(d => {
         if (bbMap.has(d.date)) {
           const bb = bbMap.get(d.date)!;
-          (d as any).bbUpper = bb.upper;
-          (d as any).bbMiddle = bb.middle;
-          (d as any).bbLower = bb.lower;
+          (d as ChartData & { bbUpper?: number; bbMiddle?: number; bbLower?: number }).bbUpper = bb.upper;
+          (d as ChartData & { bbUpper?: number; bbMiddle?: number; bbLower?: number }).bbMiddle = bb.middle;
+          (d as ChartData & { bbUpper?: number; bbMiddle?: number; bbLower?: number }).bbLower = bb.lower;
         }
       });
     }
@@ -1275,7 +1102,7 @@ export default function Dashboard() {
                         borderRadius: '8px',
                         color: 'white'
                       }}
-                      formatter={(value: any, name: any) => [
+                      formatter={(value: number | string, name: string) => [
                         typeof value === 'number' ? value.toFixed(2) : value,
                         name
                       ]}
@@ -1321,13 +1148,13 @@ export default function Dashboard() {
                         borderRadius: '8px',
                         color: 'white'
                       }}
-                      formatter={(value: any, name: any) => [
+                      formatter={(value: number | string, name: string) => [
                         typeof value === 'number' ? value.toFixed(2) : value,
                         name
                       ]}
                     />
                     <Bar dataKey="p1" name={selectedStock?.symbol ?? ''} fill="#B873F8">
-                      {mergeForCompare(prepareChartDataWithIndicators(chartData), compareOn ? prepareChartDataWithIndicators(compareChartData) : []).map((entry: any, index: number) => {
+                      {mergeForCompare(prepareChartDataWithIndicators(chartData), compareOn ? prepareChartDataWithIndicators(compareChartData) : []).map((entry: { date: string; p1: number; p2?: number }, index: number) => {
                         let color = '#B873F8';
                         const currentValue = entry.p1;
                         
@@ -1344,17 +1171,17 @@ export default function Dashboard() {
                     </Bar>
                     {compareOn && compareSymbol && (
                       <Bar dataKey="p2" name={compareSymbol} fill="#22D3EE">
-                        {mergeForCompare(prepareChartDataWithIndicators(chartData), compareOn ? prepareChartDataWithIndicators(compareChartData) : []).map((entry: any, index: number) => {
+                        {mergeForCompare(prepareChartDataWithIndicators(chartData), compareOn ? prepareChartDataWithIndicators(compareChartData) : []).map((entry: { date: string; p1: number; p2?: number }, index: number) => {
                           let color = '#22D3EE';
                           const currentValue = entry.p2;
                           
-                          if (index === 0 && comparePreviousPrice !== null) {
+                          if (index === 0 && comparePreviousPrice !== null && currentValue !== undefined) {
                             if (currentValue > comparePreviousPrice) color = '#10B981';
                             else if (currentValue < comparePreviousPrice) color = '#EF4444';
                           } else if (index > 0) {
                             const previousValue = mergeForCompare(prepareChartDataWithIndicators(chartData), compareOn ? prepareChartDataWithIndicators(compareChartData) : [])[index - 1]?.p2;
-                            if (currentValue > previousValue) color = '#10B981';
-                            else if (currentValue < previousValue) color = '#EF4444';
+                            if (currentValue !== undefined && previousValue !== undefined && currentValue > previousValue) color = '#10B981';
+                            else if (currentValue !== undefined && previousValue !== undefined && currentValue < previousValue) color = '#EF4444';
                           }
                           return <Cell key={`cell-compare-${index}`} fill={color} />;
                         })}
@@ -1392,7 +1219,7 @@ export default function Dashboard() {
                     />
                     <Tooltip 
                       contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', color: 'white' }}
-                      formatter={(value: any, name: any) => [
+                      formatter={(value: number | string, name: string) => [
                         typeof value === 'number' ? value.toFixed(2) : value,
                         name
                       ]}

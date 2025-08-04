@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils"
 import { Search, X, Loader2 } from "lucide-react"
 
 export interface SearchInputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'size'> {
   value: string
   onChange: (value: string) => void
   onClear?: () => void

@@ -252,7 +252,7 @@ class WatchlistDB {
           reject(request.error);
         };
         request.onsuccess = () => {
-          const symbols = request.result.map((item: any) => item.symbol);
+          const symbols = request.result.map((item: { symbol: string }) => item.symbol);
           console.log('[DEBUG] Retrieved watchlist symbols:', symbols);
           resolve(symbols);
         };
@@ -398,13 +398,13 @@ export async function fetchRecentIPOs(): Promise<IPOData[]> {
     console.log('NYSE IPO API response:', data);
     
     if (data.calendarList && Array.isArray(data.calendarList)) {
-      const pricedIPOs = data.calendarList.filter((ipo: any) => 
+      const pricedIPOs = data.calendarList.filter((ipo: { deal_status_flg: string; offer_px_usd: number }) => 
         ipo.deal_status_flg === 'P' && ipo.offer_px_usd > 0
       );
       
-      const sortedIPOs = pricedIPOs.sort((a: any, b: any) => b.price_dt - a.price_dt);
+      const sortedIPOs = pricedIPOs.sort((a: { price_dt: number }, b: { price_dt: number }) => b.price_dt - a.price_dt);
       
-      const recentIpoData = sortedIPOs.slice(0, 20).map((ipo: any) => {
+      const recentIpoData = sortedIPOs.slice(0, 20).map((ipo: { symbol?: string; issuer_nm?: string; price_dt: number; offer_px_usd?: number; custom_group_exchange_nm?: string; offer_size_inc_shoe_qty?: number; offer_greenshoe_inc_proceeds_usd_amt?: number }) => {
         const priceDate = new Date(ipo.price_dt);
         const formattedDate = priceDate.toISOString().split('T')[0];
         
